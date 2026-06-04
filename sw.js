@@ -1,7 +1,7 @@
 // Apnea Trainer Pro — Service Worker
 // Offline-first caching strategy
 
-const CACHE_NAME = 'apnea-pro-v2-2';
+const CACHE_NAME = 'apnea-pro-v2-3';
 const ASSETS = [
   './',
   './index.html',
