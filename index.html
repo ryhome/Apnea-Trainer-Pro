@@ -512,27 +512,86 @@ const uuid=()=>'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const 
 
 // ════════ STATE ════════
 let tab='dash',subMode='beginner',co2P='beginner',o2P='beginner';
-let S={active:false,paused:false,mode:'',steps:[],idx:0,el:0,total:0,holds:[],iv:null,cdv:0,cdt:null,target:0,fhRun:false,fhT:0,fhIv:null};
+let S={active:false,paused:false,mode:'',steps:[],idx:0,el:0,total:0,holds:[],iv:null,cdv:0,cdt:null,target:0,
+  fhRun:false,fhT:0,fhIv:null,
+  phaseStart:0,     // timestamp (ms) when current phase began
+  pausedAt:0,       // timestamp when pause began
+  lastCueSec:-1,    // last whole-second we fired a cue for, to dedupe after catch-up
+  fhStart0:0};      // freehold start timestamp
+
+// ════════ WAKE LOCK ════════
+let wakeLock=null;
+async function acquireWakeLock(){
+  try{ if('wakeLock'in navigator){ wakeLock=await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release',()=>{wakeLock=null;}); } }catch{ wakeLock=null; }
+}
+async function releaseWakeLock(){
+  try{ if(wakeLock){ await wakeLock.release(); wakeLock=null; } }catch{}
+}
+// re-acquire after returning from background (OS auto-releases the lock)
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'){
+    if((S.active&&!S.paused)||S.fhRun) acquireWakeLock();
+    // snap timers to real elapsed time immediately on resume
+    if(S.active&&!S.paused) tick();
+    if(S.fhRun) fhTick();
+  }
+});
 
 // ════════ SESSION ENGINE ════════
 const curStep=()=>S.steps[S.idx]||null;
 function startSession(mode,steps,target){
-  Object.assign(S,{mode,steps,idx:0,el:0,total:0,holds:[],target,active:true,paused:false});
+  Object.assign(S,{mode,steps,idx:0,el:0,total:0,holds:[],target,active:true,paused:false,lastCueSec:-1});
   showSession();
-  startCD(3,()=>{S.iv=setInterval(tick,1000)});
+  acquireWakeLock();
+  startCD(3,()=>{
+    S.phaseStart=Date.now();
+    S.lastCueSec=-1;
+    S.iv=setInterval(tick,250); // poll often; correctness comes from timestamps, not tick count
+    updSession();
+  });
 }
 function startCD(n,cb){S.cdv=n;cdShow(n);cdTone(n);vib(50);
   (function step(){S.cdv--;if(S.cdv<=0){cdShow(0);startTone();vib([50,100,50]);cb();}
    else{cdShow(S.cdv);cdTone(S.cdv);vib(50);S.cdt=setTimeout(step,1000);}})();
 }
-function tick(){if(S.paused)return;S.el++;S.total++;const st=curStep();if(!st){endSession();return;}
-  const rem=st.duration-S.el;
-  if(st.phase==='hold'&&rem<=3&&rem>0){cdTone(rem);vib(30);}
-  if(S.el>=st.duration){if(st.phase==='hold')S.holds.push(st.duration);
-    S.idx++;S.el=0;if(S.idx>=S.steps.length){endSession();return;}phaseTone();vib(80);}
+// Timestamp-driven: elapsed is derived from wall-clock, so it stays accurate
+// even when setInterval is throttled or the screen sleeps/backgrounds.
+function tick(){
+  if(S.paused||!S.active)return;
+  let st=curStep();if(!st){endSession();return;}
+
+  // Advance through any phases that fully elapsed (e.g. while backgrounded)
+  let elapsed=(Date.now()-S.phaseStart)/1000;
+  while(st&&elapsed>=st.duration){
+    if(st.phase==='hold')S.holds.push(st.duration);
+    S.total+=st.duration;
+    S.phaseStart+=st.duration*1000;   // carry remainder into next phase
+    S.idx++;
+    S.lastCueSec=-1;
+    st=curStep();
+    if(!st){endSession();return;}
+    phaseTone();vib(80);
+    elapsed=(Date.now()-S.phaseStart)/1000;
+  }
+
+  // whole seconds elapsed in current phase
+  const elSec=Math.floor(elapsed);
+  S.el=elSec;
+  const rem=st.duration-elSec;
+
+  // Fire per-second cues once, only for seconds we haven't cued yet
+  if(elSec>S.lastCueSec){
+    // last-3-second countdown of a HOLD
+    if(st.phase==='hold'&&rem<=3&&rem>0){cdTone(rem);vib(30);}
+    S.lastCueSec=elSec;
+  }
+
   updSession();
 }
-function endSession(){clearInterval(S.iv);S.iv=null;S.active=false;
+function endSession(){
+  clearInterval(S.iv);S.iv=null;S.active=false;
+  releaseWakeLock();
   const best=S.holds.length?Math.max(...S.holds):S.total;
   winTone();vib([100,50,100,50,200]);
   const sess={id:uuid(),date:new Date().toISOString(),mode:S.mode,target:S.target,actual:best,result:best>=S.target?'success':'partial'};
@@ -547,16 +606,39 @@ function endSession(){clearInterval(S.iv);S.iv=null;S.active=false;
 function bumpStreak(){const today=new Date().toDateString(),last=DATA.lastSessionDate;
   if(!last)DATA.streak=1;else{const diff=(new Date(today)-new Date(last))/864e5;
     if(diff===1)DATA.streak++;else if(diff>1)DATA.streak=1;}DATA.lastSessionDate=today;}
-function pauseSession(){S.paused=!S.paused;updSession();
+function pauseSession(){
+  if(!S.active)return;
+  S.paused=!S.paused;
+  if(S.paused){
+    S.pausedAt=Date.now();
+    releaseWakeLock();
+  }else{
+    // shift phaseStart forward by the paused duration so elapsed resumes seamlessly
+    S.phaseStart+=Date.now()-S.pausedAt;
+    acquireWakeLock();
+  }
+  updSession();
   const b=document.getElementById('sxBtn');if(b){b.classList.toggle('paused',S.paused);
-    b.innerHTML=S.paused?ic('play')+'<span>RESUME</span>':ic('pause')+'<span>PAUSE</span>';}}
-function exitSession(){clearInterval(S.iv);clearTimeout(S.cdt);S.active=false;S.paused=false;hideSession();renderTab();}
+    b.innerHTML=S.paused?ic('play')+'<span>RESUME</span>':ic('pause')+'<span>PAUSE</span>';}
+}
+function exitSession(){clearInterval(S.iv);clearTimeout(S.cdt);S.active=false;S.paused=false;releaseWakeLock();hideSession();renderTab();}
 
-// freehold
-function fhStart(){S.fhRun=true;S.fhT=0;S.mode='freehold';startTone();vib([50,100,50]);
-  S.fhIv=setInterval(()=>{S.fhT++;fhUpd();},1000);renderTab();}
-function fhStop(saveIt){clearInterval(S.fhIv);S.fhRun=false;
-  if(saveIt&&S.fhT>0){const t=S.fhT;const sess={id:uuid(),date:new Date().toISOString(),mode:'freehold',target:0,actual:t,result:'success'};
+// freehold — also timestamp-based
+function fhStart(){
+  S.fhRun=true;S.fhT=0;S.mode='freehold';S.fhStart0=Date.now();
+  startTone();vib([50,100,50]);acquireWakeLock();
+  S.fhIv=setInterval(fhTick,250);renderTab();
+}
+function fhTick(){
+  if(!S.fhRun)return;
+  S.fhT=Math.floor((Date.now()-S.fhStart0)/1000);
+  fhUpd();
+}
+function fhStop(saveIt){
+  clearInterval(S.fhIv);S.fhRun=false;releaseWakeLock();
+  // capture final elapsed from the clock
+  const t=Math.max(0,Math.floor((Date.now()-S.fhStart0)/1000));
+  if(saveIt&&t>0){const sess={id:uuid(),date:new Date().toISOString(),mode:'freehold',target:0,actual:t,result:'success'};
     DATA.sessions.unshift(sess);if(t>DATA.pb)DATA.pb=t;bumpStreak();save(DATA);checkAch();resultSheet(sess);}
   S.fhT=0;renderTab();}
 
