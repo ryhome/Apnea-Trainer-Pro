@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#04141f" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Apnea" />
+<meta name="description" content="Static Apnea breath-hold trainer for freedivers" />
+<title>Apnea Trainer Pro</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,400&family=Hanken+Grotesk:wght@300;400;500;600&family=Spline+Sans+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  /* Depth palette — deep ocean to abyssal */
+  --abyss:#04141f;
+  --deep:#072433;
+  --mid:#0a3147;
+  --shelf:#0e3e58;
+  --surface-1:rgba(255,255,255,0.03);
+  --surface-2:rgba(255,255,255,0.05);
+  --line:rgba(125,211,252,0.10);
+  --line-2:rgba(125,211,252,0.20);
+  --line-3:rgba(125,211,252,0.35);
+
+  --cyan:#5fd3f0;
+  --cyan-bright:#7ee8ff;
+  --aqua:#4ce0c0;
+  --amber:#f5b945;
+  --coral:#ff6b7a;
+  --teal-glow:rgba(95,211,240,0.18);
+
+  --ink:#eaf6fb;
+  --ink-2:#9cc4d6;
+  --ink-3:#5a8499;
+  --ink-4:#3a6075;
+
+  --font-display:'Fraunces',serif;
+  --font-body:'Hanken Grotesk',sans-serif;
+  --font-mono:'Spline Sans Mono',monospace;
+
+  --st:env(safe-area-inset-top,0px);
+  --sb:env(safe-area-inset-bottom,0px);
+  --nav-h:68px;
+}
+
+html,body{height:100%;overflow:hidden;background:var(--abyss);color:var(--ink);-webkit-text-size-adjust:100%}
+
+body{
+  font-family:var(--font-body);
+  font-weight:300;
+  -webkit-font-smoothing:antialiased;
+  position:relative;
+}
+
+/* ── Atmospheric depth background ── */
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(120% 80% at 50% -20%, rgba(20,90,130,0.45) 0%, transparent 55%),
+    radial-gradient(90% 60% at 90% 110%, rgba(10,60,90,0.4) 0%, transparent 50%),
+    linear-gradient(180deg, var(--deep) 0%, var(--abyss) 70%);
+}
+/* caustic light rays */
+body::after{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.5;
+  background:
+    linear-gradient(105deg, transparent 30%, rgba(95,211,240,0.04) 40%, transparent 50%),
+    linear-gradient(75deg, transparent 55%, rgba(95,211,240,0.03) 65%, transparent 72%);
+  animation:caustics 18s ease-in-out infinite alternate;
+}
+@keyframes caustics{0%{transform:translateX(-3%) translateY(0)}100%{transform:translateX(3%) translateY(2%)}}
+
+/* grain overlay */
+.grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:0.035;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+
+#root{position:relative;z-index:2;height:100%;display:flex;flex-direction:column}
+
+/* ── SHELL ── */
+.shell{height:100%;display:flex;flex-direction:column;overflow:hidden}
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+  padding-top:var(--st);
+  padding-bottom:calc(var(--nav-h) + var(--sb) + 16px);}
+::-webkit-scrollbar{width:0}
+
+/* ── ICONS (custom SVG line set) ── */
+.ic{width:22px;height:22px;display:inline-block;flex-shrink:0;stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}
+.ic-sm{width:16px;height:16px}
+.ic-lg{width:26px;height:26px}
+
+/* ── HEADER ── */
+.hd{padding:calc(20px) 22px 6px;position:relative}
+.hd-kicker{font-family:var(--font-mono);font-size:10px;letter-spacing:0.32em;text-transform:uppercase;color:var(--ink-3);display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.hd-kicker .dot{width:5px;height:5px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+.hd-title{font-family:var(--font-display);font-weight:400;font-size:34px;letter-spacing:-0.02em;line-height:1;color:var(--ink);font-optical-sizing:auto}
+.hd-title em{font-style:italic;color:var(--cyan)}
+
+/* depth ruler decoration on header */
+.ruler{position:absolute;right:22px;top:calc(20px);display:flex;flex-direction:column;gap:5px;align-items:flex-end;opacity:0.5}
+.ruler i{height:1.5px;background:var(--line-2);border-radius:2px}
+.ruler i:nth-child(odd){width:14px}
+.ruler i:nth-child(even){width:8px}
+
+/* ── SECTION ── */
+.sec{padding:0 22px;margin-bottom:22px}
+.sec-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px}
+.sec-t{font-family:var(--font-mono);font-size:10px;letter-spacing:0.22em;text-transform:uppercase;color:var(--ink-3);display:flex;align-items:center;gap:8px}
+.sec-t::before{content:'';width:14px;height:1px;background:var(--line-3)}
+
+/* ── PANELS / GLASS ── */
+.glass{
+  background:linear-gradient(160deg, rgba(14,62,88,0.55) 0%, rgba(7,36,51,0.45) 100%);
+  border:1px solid var(--line);
+  border-radius:20px;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  position:relative;overflow:hidden;
+}
+.glass::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--line-2),transparent)}
+
+/* ════════ HERO DEPTH GAUGE ════════ */
+.gauge{margin:6px 22px 24px;padding:26px 24px 22px;border-radius:26px;
+  background:
+    radial-gradient(130% 90% at 50% 0%, rgba(40,120,160,0.4) 0%, transparent 60%),
+    linear-gradient(165deg, rgba(14,62,88,0.7), rgba(5,28,40,0.6));
+  border:1px solid var(--line-2);position:relative;overflow:hidden}
+.gauge::after{content:'';position:absolute;width:280px;height:280px;border-radius:50%;
+  top:-150px;right:-100px;background:radial-gradient(circle,var(--teal-glow),transparent 70%)}
+.gauge-top{display:flex;align-items:flex-start;justify-content:space-between;position:relative;z-index:1}
+.gauge-label{font-family:var(--font-mono);font-size:10px;letter-spacing:0.28em;text-transform:uppercase;color:var(--ink-3);margin-bottom:2px}
+.gauge-pb{font-family:var(--font-mono);font-weight:500;font-size:62px;line-height:0.9;letter-spacing:-0.03em;color:var(--ink);
+  text-shadow:0 0 40px rgba(95,211,240,0.3)}
+.gauge-pb .u{font-size:24px;color:var(--ink-3);letter-spacing:0}
+.gauge-badge{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.lv-chip{font-family:var(--font-mono);font-size:11px;letter-spacing:0.1em;color:var(--cyan);
+  background:rgba(95,211,240,0.1);border:1px solid var(--line-2);border-radius:8px;padding:5px 10px}
+.lv-ring{width:54px;height:54px}
+
+.gauge-bar-wrap{margin-top:20px;position:relative;z-index:1}
+.gauge-bar-info{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;color:var(--ink-3);letter-spacing:0.06em;margin-bottom:7px}
+.gauge-bar{height:6px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;position:relative}
+.gauge-bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--aqua),var(--cyan));box-shadow:0 0 12px var(--teal-glow);transition:width 0.8s cubic-bezier(0.22,1,0.36,1)}
+/* tick marks over the bar */
+.gauge-bar-ticks{position:absolute;inset:0;display:flex;justify-content:space-between;padding:0 1px}
+.gauge-bar-ticks i{width:1px;background:rgba(4,20,31,0.6)}
+
+/* ════════ STAT TILES ════════ */
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.tile{padding:15px 16px;border-radius:18px;background:var(--surface-1);border:1px solid var(--line);position:relative;overflow:hidden;transition:border-color .25s,transform .15s}
+.tile:active{transform:scale(0.98)}
+.tile .tl{font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink-3);display:flex;align-items:center;gap:6px;margin-bottom:9px}
+.tile .tl .ic{color:var(--ink-4)}
+.tile .tv{font-family:var(--font-mono);font-weight:500;font-size:26px;letter-spacing:-0.02em;color:var(--ink);line-height:1}
+.tile .tv .u{font-size:13px;color:var(--ink-3)}
+.tile.accent .tv{color:var(--cyan)} .tile.aqua .tv{color:var(--aqua)} .tile.amber .tv{color:var(--amber)}
+.tile-spark{position:absolute;right:12px;bottom:12px;opacity:0.25;color:var(--cyan)}
+
+/* ════════ BUTTONS ════════ */
+.btn{display:flex;align-items:center;justify-content:center;gap:10px;padding:16px 22px;border-radius:15px;border:none;cursor:pointer;
+  font-family:var(--font-mono);font-size:13px;letter-spacing:0.06em;transition:transform .14s,box-shadow .25s,background .2s;-webkit-tap-highlight-color:transparent;user-select:none;width:100%}
+.btn:active{transform:scale(0.975)}
+.btn-pri{background:linear-gradient(135deg,#2b9ec4,var(--cyan));color:var(--abyss);font-weight:500;box-shadow:0 8px 30px rgba(95,211,240,0.28),inset 0 1px 0 rgba(255,255,255,0.3)}
+.btn-pri:active{box-shadow:0 4px 16px rgba(95,211,240,0.3)}
+.btn-ghost{background:var(--surface-2);border:1px solid var(--line-2);color:var(--cyan)}
+.btn-line{background:transparent;border:1px solid var(--line-2);color:var(--ink-2)}
+.btn-danger{background:rgba(255,107,122,0.08);border:1px solid rgba(255,107,122,0.3);color:var(--coral)}
+.btn-sm{padding:9px 15px;font-size:11px;border-radius:11px;width:auto}
+
+/* ════════ RECENT SESSION ROW ════════ */
+.sess-list{display:flex;flex-direction:column;gap:9px}
+.sess{display:flex;align-items:center;gap:13px;padding:13px 15px;border-radius:15px;background:var(--surface-1);border:1px solid var(--line);transition:border-color .2s}
+.sess:active{border-color:var(--line-2)}
+.sess-depth{width:3px;height:34px;border-radius:3px;flex-shrink:0}
+.sess-depth.ok{background:linear-gradient(180deg,var(--aqua),transparent);box-shadow:0 0 8px var(--aqua)}
+.sess-depth.no{background:linear-gradient(180deg,var(--coral),transparent)}
+.sess-mid{flex:1;min-width:0}
+.sess-mode{font-family:var(--font-mono);font-size:12px;letter-spacing:0.04em;color:var(--ink-2);text-transform:capitalize}
+.sess-date{font-family:var(--font-mono);font-size:10px;color:var(--ink-4);margin-top:2px}
+.sess-time{font-family:var(--font-mono);font-weight:500;font-size:19px;letter-spacing:-0.02em;color:var(--ink)}
+
+/* ════════ MODE CARDS ════════ */
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mode{padding:18px 16px;border-radius:20px;background:var(--surface-1);border:1px solid var(--line);cursor:pointer;
+  transition:all .25s;-webkit-tap-highlight-color:transparent;text-align:left;position:relative;overflow:hidden}
+.mode .mode-glow{position:absolute;width:90px;height:90px;border-radius:50%;top:-30px;right:-30px;
+  background:radial-gradient(circle,var(--teal-glow),transparent 70%);opacity:0;transition:opacity .3s}
+.mode.on,.mode:active{border-color:var(--line-3);background:rgba(95,211,240,0.06)}
+.mode.on .mode-glow{opacity:1}
+.mode .mode-ic{color:var(--cyan);margin-bottom:14px;display:block}
+.mode .mode-n{font-family:var(--font-display);font-weight:400;font-size:18px;letter-spacing:-0.01em;color:var(--ink);margin-bottom:4px}
+.mode .mode-d{font-family:var(--font-mono);font-size:10px;letter-spacing:0.03em;color:var(--ink-3);line-height:1.5}
+
+/* ════════ LEVEL GRID ════════ */
+.lv-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.lv-cell{aspect-ratio:1;border-radius:14px;border:1px solid var(--line);background:var(--surface-1);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;
+  transition:all .18s;-webkit-tap-highlight-color:transparent;position:relative;overflow:hidden}
+.lv-cell .ln{font-family:var(--font-mono);font-weight:500;font-size:15px;color:var(--ink-2);line-height:1}
+.lv-cell .lt{font-family:var(--font-mono);font-size:8px;color:var(--ink-4)}
+.lv-cell.locked{opacity:0.3}
+.lv-cell.cur{border-color:var(--cyan);background:rgba(95,211,240,0.1);box-shadow:0 0 20px var(--teal-glow)}
+.lv-cell.cur .ln{color:var(--cyan)}
+.lv-cell.done{border-color:rgba(76,224,192,0.4)}
+.lv-cell.done .ln{color:var(--aqua)}
+.lv-cell .pass-dots{position:absolute;bottom:5px;display:flex;gap:2px}
+.lv-cell .pass-dots i{width:3px;height:3px;border-radius:50%;background:var(--line-2)}
+.lv-cell .pass-dots i.f{background:var(--cyan)}
+.lv-cell .lock-ic{position:absolute;color:var(--ink-4)}
+
+/* ════════ PRESET CHIPS ════════ */
+.chips{display:flex;gap:9px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;padding:9px 16px;border-radius:22px;border:1px solid var(--line);background:var(--surface-1);
+  font-family:var(--font-mono);font-size:12px;letter-spacing:0.04em;color:var(--ink-2);cursor:pointer;transition:all .18s;-webkit-tap-highlight-color:transparent}
+.chip.on{background:rgba(95,211,240,0.12);border-color:var(--cyan);color:var(--cyan)}
+
+/* preset table preview */
+.tbl-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.tbl-row:last-child{margin-bottom:0}
+.tbl-n{width:22px;font-family:var(--font-mono);font-size:11px;color:var(--ink-4);text-align:center}
+.pill{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px;border-radius:9px;font-family:var(--font-mono);font-size:11px;letter-spacing:0.03em}
+.pill.hold{background:rgba(95,211,240,0.1);border:1px solid var(--line);color:var(--cyan)}
+.pill.rest{background:rgba(76,224,192,0.08);border:1px solid rgba(76,224,192,0.18);color:var(--aqua)}
+
+/* stepper */
+.step-row{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:15px;background:var(--surface-1);border:1px solid var(--line);margin-bottom:9px}
+.step-ic{color:var(--ink-4)}
+.step-lbl{flex:1;font-family:var(--font-mono);font-size:12px;color:var(--ink-2);letter-spacing:0.03em}
+.stepper{display:flex;align-items:center;gap:10px}
+.stp{width:32px;height:32px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface-2);color:var(--cyan);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .14s;-webkit-tap-highlight-color:transparent}
+.stp:active{background:rgba(95,211,240,0.18);transform:scale(0.9)}
+.stp-val{font-family:var(--font-mono);font-weight:500;font-size:18px;color:var(--ink);min-width:54px;text-align:center}
+
+/* ════════════ SESSION SCREEN ════════════ */
+.session{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:space-between;
+  padding:calc(var(--st) + 22px) 26px calc(var(--sb) + 26px);
+  background:
+    radial-gradient(120% 70% at 50% 25%, rgba(30,110,150,0.5) 0%, transparent 60%),
+    linear-gradient(180deg,var(--deep),var(--abyss));}
+.session.hidden{display:none}
+.sx-top{width:100%;display:flex;align-items:center;justify-content:space-between}
+.sx-mode{font-family:var(--font-mono);font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:var(--ink-3)}
+.sx-round{font-family:var(--font-mono);font-size:13px;color:var(--ink-2);letter-spacing:0.04em}
+.sx-exit{width:38px;height:38px;border-radius:50%;border:1px solid var(--line-2);background:var(--surface-2);color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
+
+/* breathing ring */
+.ring-zone{display:flex;flex-direction:column;align-items:center;gap:22px;flex:1;justify-content:center}
+.ring-box{position:relative;width:300px;height:300px;max-width:78vw;max-height:78vw}
+.ring-svg{width:100%;height:100%;transform:rotate(-90deg)}
+.r-track{fill:none;stroke:rgba(255,255,255,0.05);stroke-width:3}
+.r-ticks line{stroke:rgba(125,211,252,0.18);stroke-width:1.5}
+.r-fill{fill:none;stroke-width:6;stroke-linecap:round;transition:stroke-dashoffset .95s linear,stroke .4s}
+/* breathing pulse circle behind */
+.breath{position:absolute;top:50%;left:50%;width:60%;height:60%;border-radius:50%;transform:translate(-50%,-50%);
+  background:radial-gradient(circle,rgba(95,211,240,0.12),transparent 70%);}
+.session.ph-hold .breath{animation:breatheHold 8s ease-in-out infinite}
+.session.ph-rest .breath{animation:breatheRest 4s ease-in-out infinite}
+@keyframes breatheHold{0%,100%{transform:translate(-50%,-50%) scale(0.85);opacity:0.5}50%{transform:translate(-50%,-50%) scale(1.15);opacity:0.9}}
+@keyframes breatheRest{0%,100%{transform:translate(-50%,-50%) scale(0.9);opacity:0.4}50%{transform:translate(-50%,-50%) scale(1.1);opacity:0.7}}
+.r-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.r-phase{font-family:var(--font-mono);font-size:11px;letter-spacing:0.34em;text-transform:uppercase;transition:color .3s}
+.r-time{font-family:var(--font-mono);font-weight:300;font-size:64px;letter-spacing:-0.03em;line-height:1;transition:color .3s;font-variant-numeric:tabular-nums}
+.r-target{font-family:var(--font-mono);font-size:11px;letter-spacing:0.08em;color:var(--ink-4)}
+
+.session.ph-hold .r-phase,.session.ph-hold .r-time{color:var(--cyan)}
+.session.ph-rest .r-phase,.session.ph-rest .r-time{color:var(--aqua)}
+.session.ph-prepare .r-phase,.session.ph-prepare .r-time{color:var(--amber)}
+
+.next-tag{font-family:var(--font-mono);font-size:11px;letter-spacing:0.06em;color:var(--ink-4);padding:8px 16px;border-radius:11px;background:var(--surface-1);border:1px solid var(--line);display:flex;gap:7px;align-items:center}
+.next-tag b{color:var(--ink-2);font-weight:400}
+
+.sx-ctrl{width:100%}
+.sx-btn{width:100%;height:60px;border-radius:18px;border:none;cursor:pointer;font-family:var(--font-mono);font-size:15px;letter-spacing:0.1em;
+  background:linear-gradient(135deg,#2b9ec4,var(--cyan));color:var(--abyss);font-weight:500;display:flex;align-items:center;justify-content:center;gap:10px;
+  box-shadow:0 8px 30px rgba(95,211,240,0.3);-webkit-tap-highlight-color:transparent;transition:transform .14s}
+.sx-btn:active{transform:scale(0.97)}
+.sx-btn.paused{background:var(--surface-2);color:var(--cyan);border:1px solid var(--line-2);box-shadow:none}
+
+.countdown{position:absolute;inset:0;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:rgba(4,20,31,0.75);backdrop-filter:blur(6px);z-index:10;
+  font-family:var(--font-mono);font-weight:300;font-size:120px;color:var(--cyan)}
+.countdown.go{animation:cd .9s ease}
+@keyframes cd{0%{transform:scale(1.6);opacity:0}28%{transform:scale(1);opacity:1}82%{opacity:1}100%{opacity:0.85}}
+
+/* ════════ FREEHOLD ════════ */
+.fh{text-align:center;padding:30px 24px 10px}
+.fh-time{font-family:var(--font-mono);font-weight:300;font-size:84px;letter-spacing:-0.04em;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums;margin-bottom:6px}
+.fh-status{font-family:var(--font-mono);font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:var(--ink-3);margin-bottom:30px;display:flex;align-items:center;justify-content:center;gap:8px}
+.fh-status .pulse{width:7px;height:7px;border-radius:50%;background:var(--ink-4)}
+.fh-status.live .pulse{background:var(--cyan);animation:livePulse 1.5s ease-in-out infinite}
+@keyframes livePulse{0%,100%{box-shadow:0 0 0 0 var(--teal-glow)}50%{box-shadow:0 0 0 8px transparent}}
+
+/* ════════ HEATMAP ════════ */
+.heat{padding:18px;border-radius:20px}
+.heat-grid{display:flex;gap:3px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}
+.heat-grid::-webkit-scrollbar{display:none}
+.heat-col{display:flex;flex-direction:column;gap:3px}
+.hc{width:13px;height:13px;border-radius:3px;background:rgba(255,255,255,0.04)}
+.hc.l1{background:rgba(95,211,240,0.28)}.hc.l2{background:rgba(95,211,240,0.5)}.hc.l3{background:rgba(95,211,240,0.72)}.hc.l4{background:var(--cyan);box-shadow:0 0 6px var(--teal-glow)}
+.heat-legend{display:flex;align-items:center;gap:5px;justify-content:flex-end;margin-top:12px}
+.heat-legend span{font-family:var(--font-mono);font-size:9px;color:var(--ink-4);letter-spacing:0.04em}
+
+/* ════════ ACHIEVEMENTS ════════ */
+.ach-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.ach{padding:16px 10px;border-radius:18px;background:var(--surface-1);border:1px solid var(--line);
+  display:flex;flex-direction:column;align-items:center;gap:9px;transition:all .25s;position:relative;overflow:hidden}
+.ach.got{border-color:rgba(76,224,192,0.35);background:rgba(76,224,192,0.05)}
+.ach .ach-medal{color:var(--ink-4);transition:color .3s}
+.ach.got .ach-medal{color:var(--aqua)}
+.ach .ach-n{font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.03em;color:var(--ink-3);text-align:center;line-height:1.4}
+.ach.got .ach-n{color:var(--aqua)}
+.ach .ach-dt{font-family:var(--font-mono);font-size:8px;color:var(--ink-4)}
+
+/* ════════ CERTIFICATE ════════ */
+.cert{margin-bottom:14px;padding:30px 26px;border-radius:22px;text-align:center;position:relative;overflow:hidden;
+  background:linear-gradient(160deg,#051c28,#072433 60%,#04141f);border:1px solid var(--line-2)}
+.cert::before{content:'';position:absolute;inset:6px;border:1px solid var(--line);border-radius:16px;pointer-events:none}
+.cert::after{content:'';position:absolute;width:220px;height:220px;border-radius:50%;top:-100px;left:-60px;background:radial-gradient(circle,rgba(95,211,240,0.1),transparent 70%)}
+.cert-brand{font-family:var(--font-mono);font-size:9px;letter-spacing:0.3em;text-transform:uppercase;color:var(--ink-4);margin-bottom:14px;position:relative}
+.cert-ttl{font-family:var(--font-display);font-style:italic;font-weight:400;font-size:21px;color:var(--cyan);position:relative}
+.cert-sub{font-family:var(--font-mono);font-size:10px;letter-spacing:0.06em;color:var(--ink-4);margin-bottom:18px;position:relative}
+.cert-div{height:1px;background:linear-gradient(90deg,transparent,var(--line-3),transparent);margin:14px 0;position:relative}
+.cert-pb-l{font-family:var(--font-mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--ink-4);margin-bottom:6px;position:relative}
+.cert-pb{font-family:var(--font-mono);font-weight:500;font-size:54px;letter-spacing:-0.03em;color:var(--ink);line-height:1;position:relative}
+.cert-fields{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:16px;text-align:left;position:relative}
+.cert-f-l{font-family:var(--font-mono);font-size:8.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-4)}
+.cert-f-v{font-family:var(--font-mono);font-size:12px;color:var(--ink-2);margin-top:2px}
+
+/* ════════ SETTINGS ════════ */
+.set-card{border-radius:18px;overflow:hidden}
+.set-row{display:flex;align-items:center;gap:14px;padding:15px 17px;border-bottom:1px solid var(--line);cursor:pointer}
+.set-row:last-child{border-bottom:none}
+.set-ic{color:var(--cyan);opacity:0.8}
+.set-mid{flex:1}
+.set-l{font-size:14px;color:var(--ink);font-weight:400}
+.set-d{font-family:var(--font-mono);font-size:10.5px;color:var(--ink-3);margin-top:2px;letter-spacing:0.03em}
+.tog{width:46px;height:26px;border-radius:14px;background:rgba(255,255,255,0.1);position:relative;transition:background .25s;flex-shrink:0;cursor:pointer}
+.tog.on{background:linear-gradient(135deg,#2b9ec4,var(--cyan))}
+.tog::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .25s cubic-bezier(0.22,1,0.36,1)}
+.tog.on::after{left:23px}
+
+/* ════════ BOTTOM NAV ════════ */
+.nav{position:fixed;bottom:0;left:0;right:0;height:calc(var(--nav-h) + var(--sb));padding-bottom:var(--sb);z-index:100;
+  background:linear-gradient(180deg,rgba(4,20,31,0.7),rgba(4,20,31,0.96));
+  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid var(--line);
+  display:flex;align-items:flex-start;justify-content:space-around}
+.nav-i{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 4px 0;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;user-select:none;position:relative;color:var(--ink-4);transition:color .2s}
+.nav-i .nav-l{font-family:var(--font-mono);font-size:8.5px;letter-spacing:0.1em;text-transform:uppercase}
+.nav-i.on{color:var(--cyan)}
+.nav-i.on::before{content:'';position:absolute;top:0;width:24px;height:2px;border-radius:2px;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+.nav-i .ic{transition:transform .2s}
+.nav-i.on .ic{transform:translateY(-1px)}
+
+/* ════════ TOAST ════════ */
+.toasts{position:fixed;top:calc(var(--st) + 14px);left:50%;transform:translateX(-50%);z-index:500;display:flex;flex-direction:column;gap:8px;width:calc(100% - 36px);max-width:400px;pointer-events:none}
+.toast{display:flex;align-items:center;gap:11px;padding:13px 16px;border-radius:14px;
+  background:rgba(14,62,88,0.9);border:1px solid var(--line-2);backdrop-filter:blur(18px);
+  font-family:var(--font-mono);font-size:12.5px;color:var(--ink);letter-spacing:0.02em;
+  animation:tin .4s cubic-bezier(0.22,1,0.36,1),tout .4s ease 2.9s forwards}
+.toast .ic{color:var(--cyan)}
+@keyframes tin{from{transform:translateY(-22px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes tout{to{opacity:0;transform:translateY(-12px)}}
+
+/* ════════ BOTTOM SHEET ════════ */
+.bs-ov{position:fixed;inset:0;z-index:300;background:rgba(2,10,16,0.72);backdrop-filter:blur(5px);animation:tin .25s ease}
+.bs{position:fixed;bottom:0;left:0;right:0;z-index:301;max-height:88vh;overflow-y:auto;
+  background:linear-gradient(180deg,#0a3147,#051c28);border-top:1px solid var(--line-2);border-radius:26px 26px 0 0;
+  padding:0 0 calc(var(--sb) + 18px);animation:bsup .42s cubic-bezier(0.32,0.72,0,1)}
+@keyframes bsup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.bs-handle{width:40px;height:4px;border-radius:3px;background:rgba(255,255,255,0.15);margin:14px auto 18px}
+.bs-ttl{font-family:var(--font-display);font-weight:400;font-size:23px;padding:0 24px;margin-bottom:18px;letter-spacing:-0.01em}
+
+/* misc */
+.empty{text-align:center;padding:44px 24px;color:var(--ink-4);font-family:var(--font-mono);font-size:12.5px;letter-spacing:0.04em;line-height:1.7}
+.fade{animation:fade .35s ease}
+@keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.stg>*{opacity:0;animation:fade .5s cubic-bezier(0.22,1,0.36,1) forwards}
+.stg>*:nth-child(1){animation-delay:.02s}.stg>*:nth-child(2){animation-delay:.07s}.stg>*:nth-child(3){animation-delay:.12s}.stg>*:nth-child(4){animation-delay:.17s}.stg>*:nth-child(5){animation-delay:.22s}.stg>*:nth-child(6){animation-delay:.27s}
+.hidden{display:none!important}
+canvas#cc{display:none}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div id="root"></div>
+<canvas id="cc" width="900" height="560"></canvas>
+<div class="toasts" id="toasts"></div>
+
+<!-- SVG icon defs -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<g id="i-home"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9.5 20v-5h5v5"/></g>
+<g id="i-timer"><circle cx="12" cy="13" r="8"/><path d="M12 13V9"/><path d="M9 2h6"/><path d="m19 5 1.5-1.5"/></g>
+<g id="i-chart"><path d="M4 20V4"/><path d="M4 20h16"/><path d="M8 16v-4"/><path d="M13 16V8"/><path d="M18 16v-7"/></g>
+<g id="i-medal"><circle cx="12" cy="14" r="6"/><path d="M12 14v0"/><path d="m8.5 8.5-2-5.5h11l-2 5.5"/><path d="m12 11.5 1 2 2 .3-1.5 1.4.4 2-1.9-1-1.9 1 .4-2-1.5-1.4 2-.3z"/></g>
+<g id="i-gear"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></g>
+<g id="i-wave"><path d="M2 12c2 0 2-3 5-3s3 3 5 3 2-3 5-3 3 3 5 3"/><path d="M2 17c2 0 2-3 5-3s3 3 5 3 2-3 5-3 3 3 5 3"/></g>
+<g id="i-co2"><path d="M5 12a3 3 0 1 0 0-2"/><path d="M11 9a3 3 0 0 1 0 6 3 3 0 0 1 0-6Z"/><path d="M19 9h-2.5a1 1 0 0 0-1 1v0a1 1 0 0 0 1 1H18a1 1 0 0 1 1 1v0a1 1 0 0 1-1 1h-2.5"/></g>
+<g id="i-lung"><path d="M12 4v8"/><path d="M12 8c0-2-1.5-3-3-3"/><path d="M9 5c-3 0-4 4-4 7 0 4 1 7 3 7s2-3 2-6"/><path d="M15 5c3 0 4 4 4 7 0 4-1 7-3 7s-2-3-2-6"/></g>
+<g id="i-stop"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"/></g>
+<g id="i-play"><path d="m8 5 11 7-11 7z" fill="currentColor" stroke="none"/></g>
+<g id="i-pause"><rect x="7" y="5" width="3.5" height="14" rx="1" fill="currentColor" stroke="none"/><rect x="13.5" y="5" width="3.5" height="14" rx="1" fill="currentColor" stroke="none"/></g>
+<g id="i-flame"><path d="M12 3c1 3 4 4 4 8a4 4 0 0 1-8 0c0-1 .5-2 1-2.5C9 11 12 9 12 3Z"/></g>
+<g id="i-target"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></g>
+<g id="i-pulse"><path d="M2 12h4l2-6 4 12 2.5-7 1.5 1H22"/></g>
+<g id="i-layers"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></g>
+<g id="i-clock"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></g>
+<g id="i-down"><path d="M12 4v12"/><path d="m7 12 5 5 5-5"/><path d="M4 20h16"/></g>
+<g id="i-up"><path d="M12 20V8"/><path d="m7 12 5-5 5 5"/><path d="M4 4h16"/></g>
+<g id="i-sound"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 8a5 5 0 0 1 0 8"/></g>
+<g id="i-mute"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="m17 9 4 6M21 9l-4 6"/></g>
+<g id="i-vibrate"><rect x="8" y="4" width="8" height="16" rx="2"/><path d="M3 9v6M21 9v6"/></g>
+<g id="i-trash"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/></g>
+<g id="i-x"><path d="m6 6 12 12M18 6 6 18"/></g>
+<g id="i-lock"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></g>
+<g id="i-check"><path d="m5 13 4 4 10-11"/></g>
+<g id="i-trophy"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5v1a3 3 0 0 0 3 3M16 6h3v1a3 3 0 0 1-3 3"/><path d="M10 14h4v3h-4z"/><path d="M8 20h8"/></g>
+<g id="i-cert"><rect x="4" y="4" width="16" height="13" rx="2"/><path d="M8 9h8M8 12h5"/><circle cx="12" cy="18" r="2.5"/></g>
+<g id="i-arrow"><path d="M5 12h14M13 6l6 6-6 6"/></g>
+</defs>
+</svg>
+
+<script>
+// ════════════════════════════════════════════════
+//  APNEA TRAINER PRO v2 — engine + redesigned UI
+// ════════════════════════════════════════════════
+const ic=(n,cls='ic')=>`<svg class="${cls}" viewBox="0 0 24 24"><use href="#i-${n}"/></svg>`;
+
+// ── STORAGE ──
+const KEY='apnea_user_v2';
+const def=()=>({level:1,levelPasses:{},pb:0,streak:0,lastSessionDate:null,sessions:[],achievements:{},
+  settings:{sound:true,haptic:true,mute:false},
+  co2Custom:{hold:60,rest:120,rounds:8},o2Custom:{hold:90,rest:60,rounds:8}});
+function load(){try{const r=localStorage.getItem(KEY);return r?{...def(),...JSON.parse(r)}:def()}catch{return def()}}
+function save(d){localStorage.setItem(KEY,JSON.stringify(d))}
+let DATA=load();
+
+// ── LEVELS ──
+const lvTarget=l=>30+(l-1)*5;
+const lvUnlocked=l=>l===1||(DATA.levelPasses[l-1]||0)>=3;
+const lvProg=l=>Math.min(DATA.levelPasses[l]||0,3);
+
+// ── TABLES ──
+const CO2={beginner:{hold:30,rest:[120,110,100,90,80,70,60,50],rounds:8},
+  intermediate:{hold:60,rest:[90,80,70,60,50,45,40,35],rounds:8},
+  advanced:{hold:90,rest:[75,65,55,45,40,35,30,25],rounds:8}};
+const O2={beginner:{hold:[30,40,50,60,70,80,90,100],rest:120,rounds:8},
+  intermediate:{hold:[60,75,90,100,110,115,120,125],rest:90,rounds:8},
+  advanced:{hold:[90,105,120,130,140,150,160,170],rest:75,rounds:8}};
+const at=(v,i)=>Array.isArray(v)?v[i]:v;
+function buildTable(type,preset,custom){
+  if(preset==='custom'){const d=custom;return Array.from({length:d.rounds},()=>[
+    {phase:'prepare',duration:3},{phase:'hold',duration:d.hold},{phase:'rest',duration:d.rest}]).flat();}
+  const p=(type==='co2'?CO2:O2)[preset];
+  return Array.from({length:p.rounds},(_,i)=>[
+    {phase:'prepare',duration:3},{phase:'hold',duration:at(p.hold,i)},{phase:'rest',duration:at(p.rest,i)}]).flat();
+}
+
+// ── AUDIO ──
+let actx=null;const AC=()=>actx||(actx=new(window.AudioContext||window.webkitAudioContext)());
+function tone(f,t='sine',d=0.12,v=0.3){if(DATA.settings.mute)return;try{const c=AC(),o=c.createOscillator(),g=c.createGain();
+  o.connect(g);g.connect(c.destination);o.frequency.value=f;o.type=t;
+  g.gain.setValueAtTime(v,c.currentTime);g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+d);
+  o.start();o.stop(c.currentTime+d)}catch{}}
+const cdTone=n=>tone([330,392,440,523][n-1]||440,'sine',0.15,0.4);
+const startTone=()=>[523,659,784].forEach((f,i)=>setTimeout(()=>tone(f,'triangle',0.18,0.5),i*100));
+const phaseTone=()=>tone(660,'sine',0.2,0.35);
+const winTone=()=>[784,880,1047].forEach((f,i)=>setTimeout(()=>tone(f,'triangle',0.25,0.45),i*120));
+
+// ── HAPTIC ──
+const vib=ms=>{if(DATA.settings.haptic){try{navigator.vibrate&&navigator.vibrate(ms)}catch{}}};
+
+// ── TOAST ──
+function toast(msg,icon='check'){const c=document.getElementById('toasts');const e=document.createElement('div');
+  e.className='toast';e.innerHTML=ic(icon)+`<span>${msg}</span>`;c.appendChild(e);setTimeout(()=>e.remove(),3300);}
+
+// ── ACHIEVEMENTS ──
+const ACH=[
+  {id:'first',ic:'wave',n:'First Hold',c:d=>d.sessions.length>=1},
+  {id:'c30',ic:'target',n:'30s Club',c:d=>d.pb>=30},
+  {id:'c60',ic:'target',n:'1 Min Club',c:d=>d.pb>=60},
+  {id:'c90',ic:'target',n:'90s Club',c:d=>d.pb>=90},
+  {id:'c120',ic:'target',n:'2 Min Club',c:d=>d.pb>=120},
+  {id:'c180',ic:'target',n:'3 Min Club',c:d=>d.pb>=180},
+  {id:'s7',ic:'flame',n:'7 Day Streak',c:d=>d.streak>=7},
+  {id:'s30',ic:'flame',n:'30 Day Streak',c:d=>d.streak>=30},
+  {id:'n10',ic:'pulse',n:'10 Sessions',c:d=>d.sessions.length>=10},
+  {id:'n100',ic:'pulse',n:'100 Sessions',c:d=>d.sessions.length>=100},
+  {id:'n500',ic:'trophy',n:'500 Sessions',c:d=>d.sessions.length>=500},
+  {id:'l10',ic:'layers',n:'Level 10',c:d=>d.level>=10},
+];
+function checkAch(){ACH.forEach(a=>{if(!DATA.achievements[a.id]&&a.c(DATA)){
+  DATA.achievements[a.id]=new Date().toISOString();save(DATA);toast(`Unlocked · ${a.n}`,'medal');}});}
+
+// ── STATS ──
+function stats(){const s=DATA.sessions,ok=s.filter(x=>x.result==='success');
+  const rate=s.length?Math.round(ok.length/s.length*100):0;
+  const total=s.reduce((a,x)=>a+(x.actual||0),0);
+  const avg=s.length?Math.round(total/s.length):0;
+  const wk=s.filter(x=>new Date(x.date)>new Date(Date.now()-7*864e5)).length;
+  return{rate,total,avg,wk};}
+const fmt=s=>{const m=Math.floor(s/60),x=s%60;return m?`${m}:${String(x).padStart(2,'0')}`:`${x}s`;};
+const fmtL=s=>{const m=Math.floor(s/60),x=s%60;return`${String(m).padStart(2,'0')}:${String(x).padStart(2,'0')}`;};
+const uuid=()=>'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==='x'?r:(r&0x3|0x8)).toString(16);});
+
+// ════════ STATE ════════
+let tab='dash',subMode='beginner',co2P='beginner',o2P='beginner';
+let S={active:false,paused:false,mode:'',steps:[],idx:0,el:0,total:0,holds:[],iv:null,cdv:0,cdt:null,target:0,fhRun:false,fhT:0,fhIv:null};
+
+// ════════ SESSION ENGINE ════════
+const curStep=()=>S.steps[S.idx]||null;
+function startSession(mode,steps,target){
+  Object.assign(S,{mode,steps,idx:0,el:0,total:0,holds:[],target,active:true,paused:false});
+  showSession();
+  startCD(3,()=>{S.iv=setInterval(tick,1000)});
+}
+function startCD(n,cb){S.cdv=n;cdShow(n);cdTone(n);vib(50);
+  (function step(){S.cdv--;if(S.cdv<=0){cdShow(0);startTone();vib([50,100,50]);cb();}
+   else{cdShow(S.cdv);cdTone(S.cdv);vib(50);S.cdt=setTimeout(step,1000);}})();
+}
+function tick(){if(S.paused)return;S.el++;S.total++;const st=curStep();if(!st){endSession();return;}
+  const rem=st.duration-S.el;
+  if(st.phase==='hold'&&rem<=3&&rem>0){cdTone(rem);vib(30);}
+  if(S.el>=st.duration){if(st.phase==='hold')S.holds.push(st.duration);
+    S.idx++;S.el=0;if(S.idx>=S.steps.length){endSession();return;}phaseTone();vib(80);}
+  updSession();
+}
+function endSession(){clearInterval(S.iv);S.iv=null;S.active=false;
+  const best=S.holds.length?Math.max(...S.holds):S.total;
+  winTone();vib([100,50,100,50,200]);
+  const sess={id:uuid(),date:new Date().toISOString(),mode:S.mode,target:S.target,actual:best,result:best>=S.target?'success':'partial'};
+  DATA.sessions.unshift(sess);
+  if(best>(DATA.pb||0)){DATA.pb=best;}
+  bumpStreak();
+  if(S.mode==='beginner'&&sess.result==='success'){const l=DATA.level;DATA.levelPasses[l]=(DATA.levelPasses[l]||0)+1;
+    if(DATA.levelPasses[l]>=3&&DATA.level<30){DATA.level++;setTimeout(()=>toast(`Level Up · LV ${DATA.level}`,'up'),400);}}
+  save(DATA);checkAch();
+  setTimeout(()=>{hideSession();resultSheet(sess);renderTab();},700);
+}
+function bumpStreak(){const today=new Date().toDateString(),last=DATA.lastSessionDate;
+  if(!last)DATA.streak=1;else{const diff=(new Date(today)-new Date(last))/864e5;
+    if(diff===1)DATA.streak++;else if(diff>1)DATA.streak=1;}DATA.lastSessionDate=today;}
+function pauseSession(){S.paused=!S.paused;updSession();
+  const b=document.getElementById('sxBtn');if(b){b.classList.toggle('paused',S.paused);
+    b.innerHTML=S.paused?ic('play')+'<span>RESUME</span>':ic('pause')+'<span>PAUSE</span>';}}
+function exitSession(){clearInterval(S.iv);clearTimeout(S.cdt);S.active=false;S.paused=false;hideSession();renderTab();}
+
+// freehold
+function fhStart(){S.fhRun=true;S.fhT=0;S.mode='freehold';startTone();vib([50,100,50]);
+  S.fhIv=setInterval(()=>{S.fhT++;fhUpd();},1000);renderTab();}
+function fhStop(saveIt){clearInterval(S.fhIv);S.fhRun=false;
+  if(saveIt&&S.fhT>0){const t=S.fhT;const sess={id:uuid(),date:new Date().toISOString(),mode:'freehold',target:0,actual:t,result:'success'};
+    DATA.sessions.unshift(sess);if(t>DATA.pb)DATA.pb=t;bumpStreak();save(DATA);checkAch();resultSheet(sess);}
+  S.fhT=0;renderTab();}
+
+// ════════ RENDER ════════
+function renderTab(){const c=document.getElementById('content');if(!c)return;c.innerHTML='';
+  const d=document.createElement('div');d.className='fade';c.appendChild(d);
+  ({dash:renderDash,train:renderTrain,stats:renderStats,achieve:renderAch,settings:renderSet}[tab])(d);
+  document.querySelectorAll('.nav-i').forEach(e=>e.classList.toggle('on',e.dataset.tab===tab));
+}
+function go(t){tab=t;renderTab();}
+
+// ── DASH ──
+function renderDash(el){const st=stats(),recent=DATA.sessions.slice(0,4),tgt=lvTarget(DATA.level),pr=lvProg(DATA.level);
+  const C=2*Math.PI*22;
+  el.innerHTML=`
+  <div class="hd">
+    <div class="ruler">${'<i></i>'.repeat(7)}</div>
+    <div class="hd-kicker"><span class="dot"></span>Static Apnea · Dry Training</div>
+    <div class="hd-title">Apnea <em>Pro</em></div>
+  </div>
+
+  <div class="gauge stg">
+    <div class="gauge-top">
+      <div>
+        <div class="gauge-label">Personal Best</div>
+        <div class="gauge-pb">${DATA.pb?fmtL(DATA.pb):'––:––'}</div>
+      </div>
+      <div class="gauge-badge">
+        <div class="lv-chip">LV ${DATA.level}</div>
+        <svg class="lv-ring" viewBox="0 0 54 54">
+          <circle cx="27" cy="27" r="22" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="3.5"/>
+          <circle cx="27" cy="27" r="22" fill="none" stroke="#5fd3f0" stroke-width="3.5" stroke-linecap="round"
+            stroke-dasharray="${C}" stroke-dashoffset="${C-(pr/3)*C}" transform="rotate(-90 27 27)"/>
+          <text x="27" y="31" text-anchor="middle" font-family="Spline Sans Mono" font-size="13" fill="#eaf6fb">${pr}/3</text>
+        </svg>
+      </div>
+    </div>
+    <div class="gauge-bar-wrap">
+      <div class="gauge-bar-info"><span>Level ${DATA.level} · ${fmt(tgt)}</span><span>Next · ${fmt(lvTarget(Math.min(DATA.level+1,30)))}</span></div>
+      <div class="gauge-bar">
+        <div class="gauge-bar-fill" style="width:${(pr/3)*100}%"></div>
+        <div class="gauge-bar-ticks">${'<i></i>'.repeat(11)}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="tiles stg">
+      <div class="tile amber"><div class="tl">${ic('flame','ic ic-sm')}Streak</div><div class="tv">${DATA.streak}<span class="u"> days</span></div>${ic('flame','ic tile-spark')}</div>
+      <div class="tile accent"><div class="tl">${ic('target','ic ic-sm')}Success</div><div class="tv">${st.rate}<span class="u">%</span></div>${ic('target','ic tile-spark')}</div>
+      <div class="tile"><div class="tl">${ic('pulse','ic ic-sm')}Sessions</div><div class="tv">${DATA.sessions.length}</div>${ic('pulse','ic tile-spark')}</div>
+      <div class="tile aqua"><div class="tl">${ic('clock','ic ic-sm')}Avg Hold</div><div class="tv">${st.avg?fmt(st.avg):'––'}</div>${ic('clock','ic tile-spark')}</div>
+    </div>
+  </div>
+
+  <div class="sec stg">
+    <button class="btn btn-pri" onclick="quickStart()" style="margin-bottom:10px">${ic('play','ic ic-sm')} Begin · Level ${DATA.level} · ${fmt(tgt)}</button>
+    <button class="btn btn-line" onclick="go('train')">${ic('layers','ic ic-sm')} All Training Modes</button>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><div class="sec-t">Recent Dives</div>${DATA.sessions.length>4?`<span class="btn-sm btn-line" style="border:none;padding:4px;cursor:pointer" onclick="go('stats')">View all ${ic('arrow','ic ic-sm')}</span>`:''}</div>
+    ${recent.length?`<div class="sess-list">${recent.map(s=>`
+      <div class="sess"><div class="sess-depth ${s.result==='success'?'ok':'no'}"></div>
+        <div class="sess-mid"><div class="sess-mode">${s.mode}</div><div class="sess-date">${new Date(s.date).toLocaleDateString('en',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div></div>
+        <div class="sess-time">${fmtL(s.actual)}</div></div>`).join('')}</div>`
+    :`<div class="empty">No dives logged yet.<br>Start your first breath-hold below.</div>`}
+  </div>`;
+}
+function quickStart(){startSession('beginner',[{phase:'prepare',duration:5},{phase:'hold',duration:lvTarget(DATA.level)}],lvTarget(DATA.level));}
+
+// ── TRAIN ──
+function renderTrain(el){
+  const modes=[{id:'beginner',ic:'wave',n:'Beginner',d:'Progressive\n30s → 3 min'},
+    {id:'co2',ic:'co2',n:'CO₂ Table',d:'Lower CO₂\ntolerance'},
+    {id:'o2',ic:'lung',n:'O₂ Table',d:'Raise O₂\ncapacity'},
+    {id:'freehold',ic:'timer',n:'Free Hold',d:'Open\nstopwatch'}];
+  el.innerHTML=`
+  <div class="hd"><div class="hd-kicker"><span class="dot"></span>Choose a protocol</div><div class="hd-title">Train</div></div>
+  <div class="sec"><div class="modes stg">${modes.map(m=>`
+    <div class="mode ${subMode===m.id?'on':''}" onclick="selMode('${m.id}')">
+      <div class="mode-glow"></div>${ic(m.ic,'ic ic-lg mode-ic')}
+      <div class="mode-n">${m.n}</div><div class="mode-d">${m.d.replace('\n','<br>')}</div></div>`).join('')}</div></div>
+  <div id="panel" class="fade"></div>`;
+  ({beginner:panelBeginner,co2:()=>panelTable('co2'),o2:()=>panelTable('o2'),freehold:panelFH}[subMode])(el.querySelector('#panel'));
+}
+function selMode(m){subMode=m;renderTab();}
+
+function panelBeginner(el){const lv=DATA.level;
+  el.innerHTML=`
+  <div class="sec"><div class="sec-h"><div class="sec-t">Select Level</div></div>
+    <div class="lv-grid">${Array.from({length:30},(_,i)=>{const l=i+1,un=lvUnlocked(l),cur=l===lv,p=lvProg(l),done=p>=3&&l<lv;
+      return`<div class="lv-cell ${!un?'locked':''} ${cur?'cur':''} ${done?'done':''}" onclick="${un?`selLevel(${l})`:''}">
+        <span class="ln">${l}</span><span class="lt">${fmt(lvTarget(l))}</span>
+        ${un&&p>0&&p<3?`<div class="pass-dots">${[0,1,2].map(j=>`<i class="${j<p?'f':''}"></i>`).join('')}</div>`:''}
+        ${!un?ic('lock','ic ic-sm lock-ic'):''}</div>`;}).join('')}</div></div>
+  <div class="sec"><div class="glass" style="padding:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="font-family:var(--font-display);font-size:19px">Level ${lv}</span>
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);background:rgba(95,211,240,0.1);border:1px solid var(--line-2);padding:4px 10px;border-radius:8px">${fmt(lvTarget(lv))} target</span></div>
+    <div style="font-family:var(--font-mono);font-size:11.5px;color:var(--ink-3);line-height:1.6;margin-bottom:16px">Hold ${lvTarget(lv)}s three times to unlock Level ${lv+1}.</div>
+    <button class="btn btn-pri" onclick="startBeginner(${lv})">${ic('play','ic ic-sm')} Start Level ${lv}</button></div></div>`;
+}
+function selLevel(l){DATA.level=l;renderTab();}
+function startBeginner(l){startSession('beginner',[{phase:'prepare',duration:5},{phase:'hold',duration:lvTarget(l)}],lvTarget(l));}
+
+function panelTable(type){const cur=type==='co2'?co2P:o2P,label=type==='co2'?'CO₂':'O₂';
+  el=document.getElementById('panel');
+  el.innerHTML=`
+  <div class="sec"><div class="sec-h"><div class="sec-t">Preset</div></div>
+    <div class="chips">${['beginner','intermediate','advanced','custom'].map(p=>`
+      <div class="chip ${cur===p?'on':''}" onclick="setPreset('${type}','${p}')">${p[0].toUpperCase()+p.slice(1)}</div>`).join('')}</div></div>
+  ${cur==='custom'?`<div class="sec">${customEditor(type)}</div>`:`
+    <div class="sec"><div class="glass" style="padding:18px">${presetPreview(type,cur)}</div></div>`}
+  <div class="sec"><button class="btn btn-pri" onclick="startTable('${type}')">${ic('play','ic ic-sm')} Start ${label} Table</button></div>`;
+}
+function presetPreview(type,p){const data=(type==='co2'?CO2:O2)[p],r=data.rounds;
+  const rows=Array.from({length:Math.min(r,4)},(_,i)=>`
+    <div class="tbl-row"><span class="tbl-n">${String(i+1).padStart(2,'0')}</span>
+      <span class="pill hold">${ic('lung','ic ic-sm')}${fmt(at(data.hold,i))}</span>
+      <span class="pill rest">${ic('wave','ic ic-sm')}${fmt(at(data.rest,i))}</span></div>`).join('');
+  return`<div style="display:flex;justify-content:space-between;margin-bottom:14px">
+    <span style="font-family:var(--font-display);font-size:17px">${p[0].toUpperCase()+p.slice(1)}</span>
+    <span style="font-family:var(--font-mono);font-size:11px;color:var(--ink-3)">${r} rounds</span></div>
+    ${rows}${r>4?`<div style="text-align:center;font-family:var(--font-mono);font-size:10px;color:var(--ink-4);margin-top:6px">+ ${r-4} more rounds</div>`:''}`;
+}
+function customEditor(type){const d=type==='co2'?DATA.co2Custom:DATA.o2Custom;
+  const row=(f,lbl,iconn)=>`<div class="step-row">${ic(iconn,'ic step-ic')}<span class="step-lbl">${lbl}</span>
+    <div class="stepper"><div class="stp" onclick="adj('${type}','${f}',-${f==='rounds'?1:5})">−</div>
+    <span class="stp-val" id="v-${type}-${f}">${f==='rounds'?d.rounds:fmt(d[f])}</span>
+    <div class="stp" onclick="adj('${type}','${f}',${f==='rounds'?1:5})">+</div></div></div>`;
+  return row('hold','Hold Time','lung')+row('rest','Rest Time','wave')+row('rounds','Rounds','layers');
+}
+function adj(type,f,delta){const d=type==='co2'?DATA.co2Custom:DATA.o2Custom;
+  if(f==='rounds')d.rounds=Math.max(1,Math.min(20,d.rounds+delta));else d[f]=Math.max(5,d[f]+delta);
+  save(DATA);const e=document.getElementById(`v-${type}-${f}`);if(e)e.textContent=f==='rounds'?d.rounds:fmt(d[f]);}
+function setPreset(type,p){if(type==='co2')co2P=p;else o2P=p;renderTab();}
+function startTable(type){const preset=type==='co2'?co2P:o2P,custom=type==='co2'?DATA.co2Custom:DATA.o2Custom;
+  const steps=buildTable(type,preset,custom);
+  const tgt=preset==='custom'?custom.hold:at((type==='co2'?CO2:O2)[preset].hold,0);
+  startSession(type,steps,tgt);}
+
+function panelFH(el){const fhSess=DATA.sessions.filter(s=>s.mode==='freehold');
+  el.innerHTML=`
+  <div class="sec"><div class="glass fh">
+    <div class="fh-time" id="fhTime">${fmtL(S.fhT)}</div>
+    <div class="fh-status ${S.fhRun?'live':''}" id="fhStatus"><span class="pulse"></span>${S.fhRun?'HOLDING':'READY'}</div>
+    ${!S.fhRun?`<button class="btn btn-pri" style="max-width:200px;margin:0 auto" onclick="fhStart()">${ic('play','ic ic-sm')} Start</button>`
+      :`<div style="display:flex;gap:10px;max-width:280px;margin:0 auto"><button class="btn btn-danger" onclick="fhStop(true)">${ic('stop','ic ic-sm')} Stop & Save</button>
+        <button class="btn btn-line" style="width:auto;flex:0 0 auto;padding:16px 18px" onclick="fhStop(false)">${ic('x','ic ic-sm')}</button></div>`}
+  </div></div>
+  ${fhSess.length?`<div class="sec"><div class="sec-h"><div class="sec-t">Free Hold History</div></div>
+    <div class="sess-list">${fhSess.slice(0,5).map(s=>`<div class="sess"><div class="sess-depth ok"></div>
+      <div class="sess-mid"><div class="sess-mode">Free Hold</div><div class="sess-date">${new Date(s.date).toLocaleDateString('en',{month:'short',day:'numeric'})}</div></div>
+      <div class="sess-time">${fmtL(s.actual)}</div></div>`).join('')}</div></div>`:''}`;
+}
+function fhUpd(){const t=document.getElementById('fhTime'),s=document.getElementById('fhStatus');
+  if(t)t.textContent=fmtL(S.fhT);if(s){s.className='fh-status '+(S.fhRun?'live':'');s.innerHTML=`<span class="pulse"></span>${S.fhRun?'HOLDING':'STOPPED'}`;}}
+
+// ── STATS ──
+function renderStats(el){const st=stats(),hh=Math.floor(st.total/3600),mm=Math.floor((st.total%3600)/60);
+  el.innerHTML=`
+  <div class="hd"><div class="hd-kicker"><span class="dot"></span>Performance log</div><div class="hd-title">Statistics</div></div>
+  <div class="sec"><div class="tiles stg">
+    <div class="tile accent"><div class="tl">${ic('target','ic ic-sm')}Personal Best</div><div class="tv" style="font-size:24px">${DATA.pb?fmtL(DATA.pb):'––'}</div></div>
+    <div class="tile amber"><div class="tl">${ic('flame','ic ic-sm')}Streak</div><div class="tv">${DATA.streak}<span class="u">d</span></div></div>
+    <div class="tile"><div class="tl">${ic('pulse','ic ic-sm')}Sessions</div><div class="tv">${DATA.sessions.length}</div></div>
+    <div class="tile aqua"><div class="tl">${ic('check','ic ic-sm')}Success</div><div class="tv">${st.rate}<span class="u">%</span></div></div>
+    <div class="tile"><div class="tl">${ic('clock','ic ic-sm')}Avg Hold</div><div class="tv">${st.avg?fmt(st.avg):'––'}</div></div>
+    <div class="tile"><div class="tl">${ic('timer','ic ic-sm')}Total Time</div><div class="tv" style="font-size:18px">${hh}h ${mm}m</div></div>
+    <div class="tile"><div class="tl">${ic('chart','ic ic-sm')}Weekly</div><div class="tv">${st.wk}</div></div>
+    <div class="tile accent"><div class="tl">${ic('layers','ic ic-sm')}Level</div><div class="tv">${DATA.level}</div></div>
+  </div></div>
+  <div class="sec">${heatmap()}</div>
+  <div class="sec"><div class="sec-h"><div class="sec-t">Dive Log</div></div>
+    ${DATA.sessions.length?`<div class="sess-list" style="max-height:340px;overflow-y:auto">${DATA.sessions.slice(0,60).map(s=>`
+      <div class="sess"><div class="sess-depth ${s.result==='success'?'ok':'no'}"></div>
+        <div class="sess-mid"><div class="sess-mode">${s.mode}</div><div class="sess-date">${new Date(s.date).toLocaleDateString('en',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div></div>
+        <div class="sess-time">${fmtL(s.actual)}</div></div>`).join('')}</div>`:`<div class="empty">No dives recorded.</div>`}
+  </div>`;
+}
+function heatmap(){const today=new Date(),wb=16,cells=[];
+  for(let w=wb-1;w>=0;w--)for(let d=0;d<7;d++){const dt=new Date(today);dt.setDate(today.getDate()-w*7-(today.getDay()-d));cells.push(dt);}
+  const counts={};DATA.sessions.forEach(s=>{const k=new Date(s.date).toDateString();counts[k]=(counts[k]||0)+1;});
+  const weeks=[];for(let i=0;i<cells.length;i+=7)weeks.push(cells.slice(i,i+7));
+  return`<div class="glass heat"><div class="sec-t" style="margin-bottom:14px">${ic('chart','ic ic-sm')} Activity · ${wb} weeks</div>
+    <div class="heat-grid">${weeks.map(wk=>`<div class="heat-col">${wk.map(d=>{const c=counts[d.toDateString()]||0;
+      const l=c===0?'':c===1?'l1':c===2?'l2':c<=4?'l3':'l4';return`<div class="hc ${l}" title="${d.toDateString()}: ${c}"></div>`;}).join('')}</div>`).join('')}</div>
+    <div class="heat-legend"><span>Less</span>${['','l1','l2','l3','l4'].map(l=>`<div class="hc ${l}"></div>`).join('')}<span>More</span></div></div>`;
+}
+
+// ── ACHIEVEMENTS ──
+function renderAch(el){const got=Object.keys(DATA.achievements).length;
+  el.innerHTML=`
+  <div class="hd"><div class="hd-kicker"><span class="dot"></span>${got} of ${ACH.length} unlocked</div><div class="hd-title">Awards</div></div>
+  <div class="sec"><div class="ach-grid stg">${ACH.map(a=>`
+    <div class="ach ${DATA.achievements[a.id]?'got':''}">${ic(a.ic,'ic ic-lg ach-medal')}<div class="ach-n">${a.n}</div>
+      ${DATA.achievements[a.id]?`<div class="ach-dt">${new Date(DATA.achievements[a.id]).toLocaleDateString('en',{month:'short',day:'numeric'})}</div>`:''}</div>`).join('')}</div></div>
+  <div class="sec"><div class="sec-h"><div class="sec-t">Certificate</div></div>
+    <div class="cert">
+      <div class="cert-brand">Apnea Trainer Pro · Static Apnea</div>
+      <div class="cert-ttl">Certificate of Achievement</div>
+      <div class="cert-sub">${new Date().toLocaleDateString('en',{year:'numeric',month:'long',day:'numeric'})}</div>
+      <div class="cert-div"></div>
+      <div class="cert-pb-l">Personal Best</div><div class="cert-pb">${DATA.pb?fmtL(DATA.pb):'––:––'}</div>
+      <div class="cert-fields">
+        <div><div class="cert-f-l">Level</div><div class="cert-f-v">LV ${DATA.level}</div></div>
+        <div><div class="cert-f-l">Sessions</div><div class="cert-f-v">${DATA.sessions.length}</div></div>
+        <div><div class="cert-f-l">Streak</div><div class="cert-f-v">${DATA.streak} days</div></div>
+        <div><div class="cert-f-l">Awards</div><div class="cert-f-v">${got}/${ACH.length}</div></div>
+      </div></div>
+    ${DATA.pb?`<button class="btn btn-ghost" onclick="genCert()">${ic('cert','ic ic-sm')} Download Certificate</button>`
+      :`<div class="empty" style="padding:14px">Complete a session to generate your certificate.</div>`}</div>`;
+}
+
+// ── SETTINGS ──
+function renderSet(el){
+  el.innerHTML=`
+  <div class="hd"><div class="hd-kicker"><span class="dot"></span>Preferences</div><div class="hd-title">Settings</div></div>
+  <div class="sec"><div class="sec-h"><div class="sec-t">Audio & Haptics</div></div>
+    <div class="glass set-card">
+      <div class="set-row" onclick="tg('sound')">${ic('sound','ic set-ic')}<div class="set-mid"><div class="set-l">Sound Cues</div><div class="set-d">Countdown & phase tones</div></div><div class="tog ${DATA.settings.sound?'on':''}"></div></div>
+      <div class="set-row" onclick="tg('mute')">${ic('mute','ic set-ic')}<div class="set-mid"><div class="set-l">Mute Mode</div><div class="set-d">Silence all audio</div></div><div class="tog ${DATA.settings.mute?'on':''}"></div></div>
+      <div class="set-row" onclick="tg('haptic')">${ic('vibrate','ic set-ic')}<div class="set-mid"><div class="set-l">Haptic Feedback</div><div class="set-d">Vibration on phase change</div></div><div class="tog ${DATA.settings.haptic?'on':''}"></div></div>
+    </div></div>
+  <div class="sec"><div class="sec-h"><div class="sec-t">Backup</div></div>
+    <div class="glass set-card">
+      <div class="set-row" onclick="expJSON()">${ic('down','ic set-ic')}<div class="set-mid"><div class="set-l">Export Backup</div><div class="set-d">Download JSON</div></div>${ic('arrow','ic')}</div>
+      <div class="set-row" onclick="document.getElementById('imp').click()">${ic('up','ic set-ic')}<div class="set-mid"><div class="set-l">Import Backup</div><div class="set-d">Restore from JSON</div></div>${ic('arrow','ic')}</div>
+    </div><input type="file" id="imp" accept=".json" style="display:none" onchange="impJSON(event)"></div>
+  <div class="sec"><div class="sec-h"><div class="sec-t">Danger Zone</div></div>
+    <button class="btn btn-danger" onclick="resetAll()">${ic('trash','ic ic-sm')} Reset All Data</button></div>
+  <div class="sec" style="text-align:center"><div style="font-family:var(--font-mono);font-size:10px;color:var(--ink-4);line-height:1.8;letter-spacing:0.04em">
+    APNEA TRAINER PRO · v2<br>Offline-first · No backend · PWA<br>© 2026</div></div>`;
+}
+function tg(k){DATA.settings[k]=!DATA.settings[k];save(DATA);renderTab();}
+function expJSON(){const blob=new Blob([JSON.stringify(DATA,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`apnea-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href);toast('Backup exported','down');}
+function impJSON(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(typeof d.level!=='number'||!Array.isArray(d.sessions)){toast('Invalid backup file','x');return;}
+    DATA={...def(),...d};save(DATA);toast('Backup restored','check');renderTab();}catch{toast('Could not parse JSON','x');}};r.readAsText(f);}
+function resetAll(){if(confirm('Reset ALL data? This cannot be undone.')){localStorage.removeItem(KEY);DATA=def();toast('Data reset','check');renderTab();}}
+
+// ════════ SESSION SCREEN ════════
+function showSession(){const s=document.getElementById('session');s.classList.remove('hidden');
+  document.getElementById('sxMode').textContent=S.mode.toUpperCase();
+  const b=document.getElementById('sxBtn');b.classList.remove('paused');b.innerHTML=ic('pause')+'<span>PAUSE</span>';
+  updSession();}
+function hideSession(){document.getElementById('session').classList.add('hidden');}
+const phClass=p=>({hold:'ph-hold',rest:'ph-rest',prepare:'ph-prepare'}[p]||'ph-prepare');
+const phColor=p=>({hold:'#5fd3f0',rest:'#4ce0c0',prepare:'#f5b945'}[p]||'#f5b945');
+const phLabel=p=>({hold:'HOLD',rest:'RECOVER',prepare:'PREPARE'}[p]||p.toUpperCase());
+function updSession(){const st=curStep();if(!st)return;
+  const sx=document.getElementById('session');sx.className='session '+phClass(st.phase);
+  const rem=st.duration-S.el;
+  document.getElementById('rPhase').textContent=phLabel(st.phase);
+  document.getElementById('rTime').textContent=fmtL(rem);
+  document.getElementById('rTarget').textContent=`OF ${fmt(st.duration)}`;
+  const r=130,C=2*Math.PI*r,prog=S.el/st.duration;
+  const f=document.getElementById('rFill');if(f){f.style.strokeDasharray=C;f.style.strokeDashoffset=C-prog*C;f.setAttribute('stroke',phColor(st.phase));}
+  const nx=S.steps[S.idx+1],nt=document.getElementById('nextTag');
+  if(nt)nt.innerHTML=nx?`Next ${ic('arrow','ic ic-sm')} <b>${phLabel(nx.phase)} · ${fmt(nx.duration)}</b>`:`<b style="color:var(--aqua)">Final phase</b>`;
+  const holds=S.steps.filter(x=>x.phase==='hold').length,passed=S.steps.slice(0,S.idx+1).filter(x=>x.phase==='hold').length;
+  document.getElementById('sxRound').textContent=`${String(passed).padStart(2,'0')} / ${String(holds).padStart(2,'0')}`;}
+function cdShow(n){const o=document.getElementById('countdown');if(!o)return;
+  if(n<=0){o.style.display='none';}else{o.style.display='flex';o.textContent=n;o.classList.remove('go');void o.offsetWidth;o.classList.add('go');}}
+
+// result sheet
+function resultSheet(sess){const ok=sess.result==='success',isPB=DATA.pb===sess.actual;
+  const ov=document.createElement('div');ov.className='bs-ov';
+  const sh=document.createElement('div');sh.className='bs';
+  const close=()=>{ov.remove();sh.remove();};ov.onclick=close;
+  sh.innerHTML=`<div class="bs-handle"></div>
+    <div class="bs-ttl" style="color:${ok?'var(--aqua)':'var(--amber)'};display:flex;align-items:center;gap:10px">${ic(ok?'check':'pulse','ic')} ${ok?'Dive Complete':'Logged'}</div>
+    <div style="padding:0 24px">
+      <div style="text-align:center;padding:14px 0 22px">
+        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--ink-4);margin-bottom:8px">Best Hold</div>
+        <div style="font-family:var(--font-mono);font-weight:300;font-size:64px;color:${ok?'var(--aqua)':'var(--ink)'};line-height:1">${fmtL(sess.actual)}</div>
+        ${sess.target?`<div style="font-family:var(--font-mono);font-size:11px;color:var(--ink-4);margin-top:6px">target ${fmt(sess.target)}</div>`:''}</div>
+      ${isPB?`<div style="background:rgba(76,224,192,0.08);border:1px solid rgba(76,224,192,0.3);border-radius:14px;padding:12px;text-align:center;margin-bottom:16px;font-family:var(--font-mono);font-size:13px;color:var(--aqua);display:flex;align-items:center;justify-content:center;gap:8px">${ic('trophy','ic ic-sm')} New Personal Best</div>`:''}
+      <div class="tiles" style="margin-bottom:18px">
+        <div class="tile"><div class="tl">Mode</div><div class="tv" style="font-size:15px;text-transform:capitalize">${sess.mode}</div></div>
+        <div class="tile accent"><div class="tl">Best Ever</div><div class="tv" style="font-size:17px">${fmtL(DATA.pb)}</div></div></div>
+      <button class="btn btn-pri" style="margin-bottom:10px" id="bsDone">Done</button>
+      ${DATA.pb?`<button class="btn btn-line" id="bsCert">${ic('cert','ic ic-sm')} View Certificate</button>`:''}
+    </div>`;
+  document.body.appendChild(ov);document.body.appendChild(sh);
+  sh.querySelector('#bsDone').onclick=close;
+  const bc=sh.querySelector('#bsCert');if(bc)bc.onclick=()=>{close();go('achieve');};
+}
+
+// ════════ CERTIFICATE ════════
+function genCert(){const cv=document.getElementById('cc'),x=cv.getContext('2d'),W=900,H=560;cv.width=W;cv.height=H;
+  const bg=x.createLinearGradient(0,0,W,H);bg.addColorStop(0,'#04141f');bg.addColorStop(0.5,'#072433');bg.addColorStop(1,'#04141f');
+  x.fillStyle=bg;x.fillRect(0,0,W,H);
+  const g=x.createRadialGradient(180,260,0,180,260,260);g.addColorStop(0,'rgba(95,211,240,0.12)');g.addColorStop(1,'transparent');x.fillStyle=g;x.fillRect(0,0,W,H);
+  x.strokeStyle='rgba(95,211,240,0.45)';x.lineWidth=1.5;x.strokeRect(28,28,W-56,H-56);
+  x.strokeStyle='rgba(95,211,240,0.18)';x.lineWidth=0.5;x.strokeRect(36,36,W-72,H-72);
+  x.textAlign='center';
+  x.fillStyle='rgba(90,132,153,0.9)';x.font='12px monospace';x.fillText('A P N E A   T R A I N E R   P R O   ·   S T A T I C   A P N E A',W/2,80);
+  const dv=x.createLinearGradient(150,0,W-150,0);dv.addColorStop(0,'transparent');dv.addColorStop(0.5,'rgba(95,211,240,0.6)');dv.addColorStop(1,'transparent');
+  x.strokeStyle=dv;x.lineWidth=1;x.beginPath();x.moveTo(150,98);x.lineTo(W-150,98);x.stroke();
+  x.fillStyle='#eaf6fb';x.font='italic 32px Georgia, serif';x.fillText('Certificate of Achievement',W/2,148);
+  x.fillStyle='rgba(90,132,153,0.85)';x.font='12px monospace';x.fillText('P E R S O N A L   B E S T',W/2,210);
+  x.fillStyle='#5fd3f0';x.font='600 84px monospace';x.fillText(fmtL(DATA.pb),W/2,300);
+  x.strokeStyle=dv;x.beginPath();x.moveTo(220,330);x.lineTo(W-220,330);x.stroke();
+  const arr=[['LEVEL',`LV ${DATA.level}`],['SESSIONS',DATA.sessions.length],['STREAK',`${DATA.streak}d`],['AWARDS',`${Object.keys(DATA.achievements).length}/${ACH.length}`]];
+  arr.forEach((s,i)=>{const px=W/2-243+i*162;x.fillStyle='rgba(90,132,153,0.8)';x.font='11px monospace';x.fillText(s[0],px,378);
+    x.fillStyle='#eaf6fb';x.font='600 20px monospace';x.fillText(s[1],px,408);});
+  const tz=Intl.DateTimeFormat().resolvedOptions().timeZone,now=new Date();
+  x.fillStyle='rgba(90,132,153,0.7)';x.font='12px monospace';
+  x.fillText(`${now.toLocaleDateString('en',{year:'numeric',month:'long',day:'numeric'})}  ·  ${tz}`,W/2,460);
+  const last=DATA.sessions[0];if(last){x.font='10px monospace';x.fillText(`ID ${last.id.slice(0,8).toUpperCase()}`,W/2,484);}
+  x.fillStyle='rgba(90,132,153,0.4)';x.font='10px monospace';x.fillText('apnea-trainer-pro',W/2,510);
+  const a=document.createElement('a'),ts=now.toISOString().replace(/[:.]/g,'').slice(0,15);
+  a.download=`apnea-achievement-${ts}.png`;a.href=cv.toDataURL('image/png');a.click();toast('Certificate downloaded','down');}
+
+// ════════ BUILD APP ════════
+function build(){
+  document.getElementById('root').innerHTML=`
+  <div class="shell">
+    <div class="scroll" id="content"></div>
+    <nav class="nav">
+      ${[['dash','home','Home'],['train','timer','Train'],['stats','chart','Stats'],['achieve','medal','Awards'],['settings','gear','Settings']].map(([t,i,l])=>`
+        <div class="nav-i ${t==='dash'?'on':''}" data-tab="${t}" onclick="go('${t}')">${ic(i,'ic')}<span class="nav-l">${l}</span></div>`).join('')}
+    </nav>
+    <div class="session hidden ph-prepare" id="session">
+      <div class="sx-top">
+        <div class="sx-mode" id="sxMode">—</div>
+        <div class="sx-round" id="sxRound">00 / 00</div>
+        <div class="sx-exit" onclick="exitSession()">${ic('x','ic ic-sm')}</div>
+      </div>
+      <div class="ring-zone">
+        <div class="ring-box">
+          <div class="breath"></div>
+          <svg class="ring-svg" viewBox="0 0 300 300">
+            <circle class="r-track" cx="150" cy="150" r="130"/>
+            <g class="r-ticks">${Array.from({length:60},(_,i)=>{const a=i*6*Math.PI/180,r1=141,r2=i%5===0?148:145;
+              return`<line x1="${150+r1*Math.cos(a)}" y1="${150+r1*Math.sin(a)}" x2="${150+r2*Math.cos(a)}" y2="${150+r2*Math.sin(a)}"/>`;}).join('')}</g>
+            <circle class="r-fill" id="rFill" cx="150" cy="150" r="130" stroke="#5fd3f0" stroke-dasharray="816.8" stroke-dashoffset="816.8"/>
+          </svg>
+          <div class="r-center">
+            <div class="r-phase" id="rPhase">PREPARE</div>
+            <div class="r-time" id="rTime">00:00</div>
+            <div class="r-target" id="rTarget">—</div>
+          </div>
+          <div class="countdown" id="countdown" style="display:none"></div>
+        </div>
+        <div class="next-tag" id="nextTag">Next <b>—</b></div>
+      </div>
+      <div class="sx-ctrl"><button class="sx-btn" id="sxBtn" onclick="pauseSession()">${ic('pause')}<span>PAUSE</span></button></div>
+    </div>
+  </div>`;
+  renderTab();
+}
+function regSW(){if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});}
+document.addEventListener('DOMContentLoaded',()=>{build();regSW();
+  document.addEventListener('touchstart',()=>{try{AC().resume()}catch{}},{once:true});});
+</script>
+</body>
+</html>
